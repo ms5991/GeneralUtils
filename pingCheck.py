@@ -32,24 +32,27 @@ def send_email(sendToAddress, emailConfigFile):
 def main(argv):
 
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "e", ["file="])
+		opts, args = getopt.getopt(sys.argv[1:], "e", ["file=","target="])
 	except (getopt.GetoptError, e):
 		print('pingCHeck.py: {0}'.format(str(e)))
 		sys.exit(2)
 
 	emailConfigFile = 'email_config.json'
 	sendEmail = False
+	sendTo = None
 	for opt, arg in opts:
 		if opt in ['-e']:
 			print("Sending email due to opt [{0}]".format(opt))
 			sendEmail = True
 		elif opt in ['-f', '--file']:
 			emailConfigFile = arg
+		elif opt in ['--target']:
+			sendTo = arg
 
 	print("Email config file {0}".format(emailConfigFile))
 
 	response = os.system("ping -c 1 " + "192.168.1.10")
-	response = 1
+
 	#and then check the response...
 	if response == 0:
 		print("Got a valid response")
@@ -57,7 +60,7 @@ def main(argv):
 		print("Did not get a valid response")
 
 		if sendEmail:
-			send_email("mschulz5991@gmail.com", emailConfigFile)
+			send_email(sendTo, emailConfigFile)
 
 # call main
 if __name__ == "__main__":
