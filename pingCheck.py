@@ -3,14 +3,7 @@
 
 import os, sys, getopt, json, smtplib
 
-
-def send_email(sendToAddress, emailConfigFile):
-
-	print("Opening {0}".format(emailConfigFile))
-	# load config data
-	with open(emailConfigFile) as conf:
-		print('Loading json email data...')
-		emailData = json.load(conf)
+def send_email(sendToAddress, userName, password, message):
 
 	# send via gmail (the email address has to be a gmail
 	server = smtplib.SMTP('smtp.gmail.com:587')
@@ -18,13 +11,13 @@ def send_email(sendToAddress, emailConfigFile):
 	server.starttls()
 
 	# this is way easier than I expected
-	server.login(emailData["username"], emailData["password"])
+	server.login(userName, password)
 
 	# use message headers -- you need a blank line between the subject and the message body
-	message = "\r\n".join(["From: {0}".format(emailData["username"]), "To: {0}".format(sendToAddress), "Subject: Ping test failed", "\nHello, a ping test failed. -Rpi"])
+	message = "\r\n".join(["From: {0}".format(userName), "To: {0}".format(sendToAddress), "Subject: Ping test failed", message])
 
 	# actually sends it
-	server.sendmail(emailData["username"], sendToAddress, message)
+	server.sendmail(userName, sendToAddress, message)
 	server.quit()
 
 	print ('Successfully sent email to {0}'.format(sendToAddress))
@@ -42,7 +35,6 @@ def main(argv):
 	sendTo = None
 	for opt, arg in opts:
 		if opt in ['-e']:
-			print("Sending email due to opt [{0}]".format(opt))
 			sendEmail = True
 		elif opt in ['-f', '--file']:
 			emailConfigFile = arg
@@ -51,16 +43,33 @@ def main(argv):
 
 	print("Email config file {0}".format(emailConfigFile))
 
-	response = os.system("ping -c 1 " + "192.168.1.10")
+	with open(emailConfigFile) as conf:
+		configData = json.load(conf)
 
-	#and then check the response...
-	if response == 0:
-		print("Got a valid response")
-	else:
-		print("Did not get a valid response")
+	errorMessage = "Hello,\nFailed when testing the following: \n{0}\n -Rpi"
+	failedList = []
+	for x in range(len(configData["monitor"])):
 
-		if sendEmail:
-			send_email(sendTo, emailConfigFile)
+		ip = configData["monitor"][x]["IP"]
+		name = configData["monitor"][x]["name"]
+
+		print("Pinging {0} using IP {1}".format(name, ip))
+
+		response = os.system("ping -c 1 " + ip)
+
+		#and then check the response...
+		if response == 0:
+			print("Got a valid response for {0} ({1})".format(name, ip))
+		else:
+			print("Did not get a valid response for {0} ({1})".format(name, ip))
+			failedList.append("{0},{1}".format(name, ip))
+
+	if len(failedList) > 0 and sendEmail:
+		failedStr = "\n".join(failedList)
+
+		print("Sending email to {0} with {1} failures".format(sendTo, len(failedList)))
+
+		send_email(sendTo, configData["username"], configData["password"], errorMessage.format(failedStr))
 
 # call main
 if __name__ == "__main__":
