@@ -52,7 +52,7 @@ def main(argv):
 		configData = json.load(conf)
 
 	# if an email is sent, this is the format string
-	errorMessage = "Hello,\nFailed when testing the following: \n{0}\n -Rpi"
+	errorMessage = "Hello,\nThe following endpoints did not respond to ping requests: \n{0}\n -Rpi"
 
 	# keep track of failed addresses that must
 	# result in an email this time
