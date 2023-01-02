@@ -1,7 +1,7 @@
 
 #!/usr/bin/env python3
 
-import os, os.path, sys, getopt, json, smtplib, time, datetime
+import os, os.path, sys, getopt, json, smtplib, time, datetime, http.client, urllib
 
 def send_email(sendToAddress, userName, password, message):
 
@@ -22,27 +22,40 @@ def send_email(sendToAddress, userName, password, message):
 
 	print ('Successfully sent email to {0}'.format(sendToAddress))
 
+def send_pushover(userKey, token, message):
+	conn = http.client.HTTPSConnection("api.pushover.net:443")
+	conn.request("POST", "/1/messages.json",
+  	urllib.parse.urlencode({
+    		"token": token,
+    		"user": userKey,
+    		"message": message,
+  	}), { "Content-type": "application/x-www-form-urlencoded" })
+	conn.getresponse()
+
+	print ("Successfully sent Pushover notification")
+
 def main(argv):
 
 	# parse options, all are required
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "e", ["file=","target="])
+		opts, args = getopt.getopt(sys.argv[1:], "p", ["file=","target="])
 	except (getopt.GetoptError, e):
 		print('pingCheck.py: {0}'.format(str(e)))
 		sys.exit(2)
 
 	sendEmail = False
+	usePushover = False
 	sendTo = None
 
 	for opt, arg in opts:
-		# only send email if -e is used
-		if opt in ['-e']:
-			sendEmail = True
-		# config file location
+		# pushover integration
+		if opt in ['-p']:
+			usePushover = True
 		elif opt in ['--file']:
 			emailConfigFile = arg
 		# email address to send to
 		elif opt in ['--target']:
+			sendEmail = True
 			sendTo = arg
 
 	print("Email config file {0}".format(emailConfigFile))
@@ -138,7 +151,7 @@ def main(argv):
 
 	# if any IP addresses failed, send an email for
 	# all IP addresses that failed
-	if len(mustSend) > 0 and sendEmail:
+	if len(mustSend) > 0:
 		failedStr = "\n".join(allFailures)
 
 		# update state file for all addresses we are emailing about right now
@@ -147,8 +160,15 @@ def main(argv):
 
 		print("Sending email to {0} with {1} failures".format(sendTo, len(allFailures)))
 
-		# send the email
-		send_email(sendTo, configData["username"], configData["password"], errorMessage.format(failedStr))
+		finalErrorString = errorMessage.format(failedStr)
+
+		if sendEmail:
+			# send the email
+			send_email(sendTo, configData["username"], configData["password"], finalErrorString)
+
+		if usePushover:
+			# send notification to pushover
+			send_pushover(configData["pushoveruserkey"], configData["pushovertoken"], finalErrorString)
 
 	# write the state file
 	with open(stateFileLocation,"w") as sf:
